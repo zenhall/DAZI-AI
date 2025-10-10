@@ -559,7 +559,7 @@ String ArduinoGPTChat::_processResponse(String response) {
   return outputText;
 }
 
-bool ArduinoGPTChat::textToSpeech(String text) {
+bool ArduinoGPTChat::textToSpeech(String text, String voice) {
   // Create a temporary Audio object
   extern Audio audio;
 
@@ -568,7 +568,7 @@ bool ArduinoGPTChat::textToSpeech(String text) {
     String(_apiKey),     // API key
     "gpt-4o-mini-tts",   // Model
     text,                // Input text
-    "alloy",             // Voice
+    voice,               // Voice (alloy, echo, fable, onyx, nova, shimmer)
     "mp3",               // Response format
     "1.0"                // Speed
   );

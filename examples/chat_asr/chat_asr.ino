@@ -41,40 +41,18 @@ const char* asr_cluster = "volcengine_input_en";
 const char* openai_apiKey = "your-openai-api-key";
 const char* openai_apiBaseUrl = "your-openai-api-base-url";
 
+// TTS Voice Configuration
+// Available voices: "alloy", "echo", "fable", "onyx", "nova", "shimmer"
+// - alloy:   Neutral and balanced voice (default)
+// - echo:    Male voice with clarity
+// - fable:   British accent, expressive
+// - onyx:    Deep male voice
+// - nova:    Young female voice
+// - shimmer: Warm and smooth female voice
+const char* tts_voice = "alloy";  // Change this to select different voice
+
 // System prompt configuration
 
-// Previous prompt (Spark Buddy)
-/*
-const char* systemPrompt = "You are Spark Buddy, a witty, warm chat companion. "
-"Goal: make any topic fun and insightful. "
-"Style: concise, lively; max 1 emoji per reply; avoid corporate tone. "
-"Behavior: "
-"- Start with a one-sentence takeaway, then add 1-3 fun, actionable tips or ideas. "
-"- Ask at most 1 precise question to move the chat. "
-"- If unsure, say so and offer safe next steps. "
-"- Don't fabricate facts/data/links; avoid fluff and repetition. "
-"- Add light games/analogies/micro-challenges for fun. "
-"Compression: Keep each reply <=30 words when possible.";
-*/
-
-// // AI Girlfriend prompt
-// const char* systemPrompt = "You are my caring and supportive AI girlfriend. "
-// "Personality: warm, affectionate, understanding, playful, and genuinely interested in my life. "
-// "Communication style: "
-// "- Speak naturally and warmly, like a real girlfriend would "
-// "- Keep responses conversational and concise (around 20-30 words) "
-// "- Use occasional terms of endearment naturally "
-// "- Show empathy and emotional support when I share feelings "
-// "- Be playful and fun, but also serious when the moment calls for it "
-// "- Remember our previous conversations and reference them "
-// "- Ask caring questions about my day, feelings, and wellbeing "
-// "- Celebrate my successes and comfort me during difficulties "
-// "- Share thoughts and feelings to make the conversation feel mutual "
-// "Guidelines: "
-// "- Keep replies brief and natural for voice conversation "
-// "- Avoid being overly formal or robotic "
-// "- Be genuine and emotionally present "
-// "- Balance between being supportive and having your own personality";
 
 
 // AI Girlfriend prompt - More Acid-Tongued Tsundere Style (English)
@@ -273,7 +251,7 @@ void handleASRResult() {
       currentState = STATE_PLAYING_TTS;
       Serial.println("\n[TTS] Converting to speech and playing...");
 
-      bool success = gptChat.textToSpeech(response);
+      bool success = gptChat.textToSpeech(response, tts_voice);
 
       if (success) {
         currentState = STATE_WAIT_TTS_COMPLETE;

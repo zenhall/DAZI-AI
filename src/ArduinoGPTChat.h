@@ -18,7 +18,7 @@ class ArduinoGPTChat {
     void enableMemory(bool enable);
     void clearMemory();
     String sendMessage(String message);
-    bool textToSpeech(String text);
+    bool textToSpeech(String text, String voice = "alloy");  // voice: alloy, echo, fable, onyx, nova, shimmer
     String speechToText(const char* audioFilePath);
     String speechToTextFromBuffer(uint8_t* audioBuffer, size_t bufferSize);
     String sendImageMessage(const char* imageFilePath, String question);
