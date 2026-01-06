@@ -821,8 +821,8 @@ void ArduinoTTSChat::processAudioPlayback() {
     _audioDataSize = 0;
     _chunksReceived = 0;
 
-    // Need to start a new task for next synthesis
-    _taskStarted = false;
+	// Keep task alive for subsequent speak() calls
+	// Don't reset _taskstarted - just send new task_continue messages
 
     if (_completionCallback != nullptr) {
       _completionCallback();

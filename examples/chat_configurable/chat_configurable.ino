@@ -26,7 +26,7 @@
 #include <WiFi.h>
 #include <ArduinoASRChat.h>
 #include <ArduinoGPTChat.h>
-#include <ArduinoMinimaxTTS.h>
+#include <ArduinoTTSChat.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include "Audio.h"
@@ -81,8 +81,8 @@ float tts_speed = 1.0;
 float tts_volume = 1.0;
 String tts_model = "speech-2.6-hd";
 String tts_audio_format = "mp3";
-int tts_sample_rate = 32000;
-int tts_bitrate = 128000;
+int tts_sample_rate = 16000;  // WebSocket TTS: 16000 Hz for best quality
+int tts_bitrate = 32000;      // WebSocket TTS: 32000 bps minimum
 
 // Configuration status
 bool configReceived = false;
@@ -95,8 +95,11 @@ bool systemInitialized = false;
 Audio audio;
 ArduinoASRChat* asrChat = nullptr;
 ArduinoGPTChat* gptChat = nullptr;
-ArduinoMinimaxTTS* minimaxTTS = nullptr;
+ArduinoTTSChat* ttsChat = nullptr;  // WebSocket-based TTS for Pro version
 Preferences preferences;
+
+// TTS completion flag for WebSocket mode
+volatile bool ttsCompleted = false;
 
 // ============================================================================
 // State Machine Definition
@@ -414,12 +417,7 @@ bool initializeSystem() {
   Serial.print("Free Heap: ");
   Serial.print(ESP.getFreeHeap());
   Serial.println(" bytes");
-  
-  // ========== Audio Output Initialization ==========
-  audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-  audio.setVolume(20);
-  Serial.println("Audio player initialized");
-  
+
   // ========== ASR Initialization ==========
   asrChat = new ArduinoASRChat(asr_api_key.c_str(), asr_cluster.c_str());
   
@@ -454,21 +452,40 @@ bool initializeSystem() {
   
   // ========== TTS Initialization (Based on subscription type) ==========
   if (subscription == "pro") {
-    // Pro version: Use MiniMax TTS
-    minimaxTTS = new ArduinoMinimaxTTS(minimax_apiKey.c_str(), minimax_groupId.c_str(), &audio);
-    minimaxTTS->setVoiceId(tts_voice_id.c_str());
-    minimaxTTS->setSpeed(tts_speed);
-    minimaxTTS->setVolume(tts_volume);
-    minimaxTTS->setModel(tts_model.c_str());
-    minimaxTTS->setAudioFormat(tts_audio_format.c_str());
-    minimaxTTS->setSampleRate(tts_sample_rate);
-    minimaxTTS->setBitrate(tts_bitrate);
-    
-    Serial.println("TTS Mode: MiniMax (Pro)");
-    Serial.printf("Config: Voice=%s, Format=%s, SampleRate=%d\n",
-                  tts_voice_id.c_str(), tts_audio_format.c_str(), tts_sample_rate);
+    // Pro version: Use MiniMax WebSocket TTS (lower latency)
+    ttsChat = new ArduinoTTSChat(minimax_apiKey.c_str());
+
+    // Configure TTS parameters (MUST be done BEFORE speaker init)
+    ttsChat->setVoiceId(tts_voice_id.c_str());
+    ttsChat->setSpeed(tts_speed);
+    ttsChat->setVolume(tts_volume);
+    ttsChat->setAudioParams(tts_sample_rate, tts_bitrate);
+
+    // Initialize I2S speaker for WebSocket TTS
+    Serial.println("Initializing WebSocket TTS speaker...");
+    if (!ttsChat->initMAX98357Speaker(I2S_BCLK, I2S_LRC, I2S_DOUT)) {
+      Serial.println("WebSocket TTS speaker initialization failed!");
+      return false;
+    }
+
+    // Set callbacks
+    ttsChat->setCompletionCallback(onTTSComplete);
+    ttsChat->setErrorCallback(onTTSError);
+
+    // Connect to MiniMax WebSocket
+    Serial.println("Connecting to MiniMax TTS WebSocket...");
+    if (!ttsChat->connectWebSocket()) {
+      Serial.println("WebSocket connection failed!");
+      return false;
+    }
+
+    Serial.println("TTS Mode: MiniMax WebSocket (Pro)");
+    Serial.printf("Config: Voice=%s, Speed=%.1f, SampleRate=%d\n",
+                  tts_voice_id.c_str(), tts_speed, tts_sample_rate);
   } else {
-    // Free version: Use OpenAI TTS
+    // Free version: Use OpenAI TTS (Audio library needed)
+    audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+    audio.setVolume(20);
     Serial.println("TTS Mode: OpenAI (Free)");
   }
   
@@ -476,6 +493,20 @@ bool initializeSystem() {
   Serial.println("Press BOOT button to start/stop conversation");
   
   return true;
+}
+
+// ============================================================================
+// TTS Callback Functions (for WebSocket TTS)
+// ============================================================================
+
+void onTTSComplete() {
+  Serial.println("[TTS] WebSocket playback completed");
+  ttsCompleted = true;
+}
+
+void onTTSError(const char* error) {
+  Serial.printf("[TTS Error] %s\n", error);
+  ttsCompleted = true;
 }
 
 // ============================================================================
@@ -544,11 +575,12 @@ void handleASRResult() {
       // ========== Convert to Speech and Play ==========
       currentState = STATE_PLAYING_TTS;
       bool success = false;
-      
+
       if (subscription == "pro") {
-        // Pro: Use MiniMax TTS
-        Serial.println("\n[MiniMax TTS] Converting to speech...");
-        success = minimaxTTS->synthesizeAndPlay(response);
+        // Pro: Use MiniMax WebSocket TTS
+        Serial.println("\n[MiniMax TTS] Converting to speech (WebSocket)...");
+        ttsCompleted = false;  // Reset completion flag
+        success = ttsChat->speak(response.c_str());
       } else {
         // Free: Use OpenAI TTS
         Serial.println("\n[OpenAI TTS] Converting to speech...");
@@ -686,9 +718,15 @@ void loop() {
     return;
   }
   
-  // ========== Process Audio Loop ==========
-  audio.loop();
-  
+  // ========== Process TTS/Audio Loop ==========
+  if (subscription == "pro" && ttsChat != nullptr) {
+    // WebSocket TTS: process WebSocket messages (audio playback is handled by FreeRTOS task)
+    ttsChat->loop();
+  } else {
+    // Free mode: process Audio library loop
+    audio.loop();
+  }
+
   // ========== Process ASR Loop ==========
   if (asrChat != nullptr) {
     asrChat->loop();
@@ -728,14 +766,24 @@ void loop() {
     case STATE_WAIT_TTS_COMPLETE:
       if (millis() - ttsCheckTime > 100) {
         ttsCheckTime = millis();
-        
-        if (!audio.isRunning()) {
+
+        // Check completion based on subscription type
+        bool playbackComplete = false;
+        if (subscription == "pro") {
+          // WebSocket TTS: check callback flag or isPlaying
+          playbackComplete = ttsCompleted || !ttsChat->isPlaying();
+        } else {
+          // OpenAI TTS: check Audio library
+          playbackComplete = !audio.isRunning();
+        }
+
+        if (playbackComplete) {
           Serial.println("[TTS] Playback completed");
-          
+
           if (continuousMode) {
             delay(500);
             currentState = STATE_LISTENING;
-            
+
             if (asrChat->startRecording()) {
               Serial.println("\n[ASR] Listening... Please speak");
             } else {
@@ -749,7 +797,11 @@ void loop() {
           // Check timeout
           if (millis() - ttsStartTime > 60000) {
             Serial.println("[Warning] TTS timeout, forcing restart");
-            
+
+            if (subscription == "pro" && ttsChat != nullptr) {
+              ttsChat->stop();  // Stop WebSocket TTS
+            }
+
             if (continuousMode) {
               currentState = STATE_LISTENING;
               if (asrChat->startRecording()) {
@@ -771,8 +823,11 @@ void loop() {
   }
   
   // ========== Loop Delay Control ==========
-  if (currentState == STATE_LISTENING) {
-    yield();
+  if (currentState == STATE_LISTENING ||
+      currentState == STATE_PLAYING_TTS ||
+      currentState == STATE_WAIT_TTS_COMPLETE) {
+    // Fast loop for audio streaming - use minimal delay
+    delay(1);
   } else {
     delay(10);
   }
