@@ -125,6 +125,37 @@ bool ArduinoASRChat::initINMP441Microphone(int i2sSckPin, int i2sWsPin, int i2sS
 }
 
 /**
+ * @brief Initialize M5CoreS3 built-in microphone
+ * @return true if initialization successful, false if failed
+ * @note Requires M5CoreS3.h to be included and CoreS3.begin() called first
+ * @note The M5CoreS3 microphone is managed by M5Unified library
+ */
+bool ArduinoASRChat::initM5CoreS3Microphone() {
+  _micType = MIC_TYPE_M5CORES3;
+
+  // Allocate microphone buffer if not already allocated
+  if (_m5MicBuffer == nullptr) {
+    if (psramFound()) {
+      _m5MicBuffer = (int16_t*)ps_malloc(_m5MicBufferSize * sizeof(int16_t));
+      Serial.println("Using PSRAM for M5CoreS3 mic buffer");
+    } else {
+      _m5MicBuffer = new int16_t[_m5MicBufferSize];
+      Serial.println("Using heap for M5CoreS3 mic buffer");
+    }
+  }
+
+  if (_m5MicBuffer == nullptr) {
+    Serial.println("Failed to allocate M5CoreS3 mic buffer!");
+    return false;
+  }
+
+  Serial.printf("M5CoreS3 microphone mode enabled at %d Hz\n", _sampleRate);
+  Serial.println("Note: Mic and Speaker cannot be used simultaneously on M5CoreS3");
+
+  return true;
+}
+
+/**
  * @brief Generate WebSocket handshake key
  * @return Base64 encoded random key string
  * @details Used for WebSocket protocol handshake, generates 16 random bytes and Base64 encodes them
@@ -368,12 +399,19 @@ void ArduinoASRChat::loop() {
  * @brief Process audio data sending
  * @details Read audio samples from I2S microphone, buffer and batch send to server
  *          Print a progress dot every second, avoid I2S buffer overflow
+ *          For M5CoreS3 mode, audio data is fed via feedAudioData() instead
  */
 void ArduinoASRChat::processAudioSending() {
   // Print a progress dot every second
   if (millis() - _lastDotTime > 1000) {
     Serial.print(".");
     _lastDotTime = millis();
+  }
+
+  // M5CoreS3 mode: audio data is fed externally via feedAudioData()
+  if (_micType == MIC_TYPE_M5CORES3) {
+    yield();
+    return;
   }
 
   // Tight loop to read audio samples, keep in sync with I2S data rate
@@ -398,6 +436,34 @@ void ArduinoASRChat::processAudioSending() {
   }
 
   yield();  // Yield CPU to other tasks
+}
+
+/**
+ * @brief Feed audio data from external source (for M5CoreS3 mode)
+ * @param data Pointer to audio data (16-bit signed PCM)
+ * @param samples Number of samples
+ * @details Buffers the audio data and sends in batches to the server
+ */
+void ArduinoASRChat::feedAudioData(const int16_t* data, size_t samples) {
+  if (!_isRecording || data == nullptr || samples == 0) {
+    return;
+  }
+
+  // Process samples
+  for (size_t i = 0; i < samples; i++) {
+    int16_t sample = data[i];
+
+    // Filter invalid data
+    if (sample != 0 && sample != -1 && sample != 1) {
+      _sendBuffer[_sendBufferPos++] = sample;
+
+      // Buffer full, send batch immediately
+      if (_sendBufferPos >= _sendBatchSize / 2) {
+        sendAudioChunk((uint8_t*)_sendBuffer, _sendBufferPos * 2);
+        _sendBufferPos = 0;
+      }
+    }
+  }
 }
 
 /**

@@ -155,6 +155,34 @@ bool ArduinoTTSChat::initInternalDAC(int dacPin) {
 }
 
 /**
+ * @brief Initialize M5CoreS3 built-in speaker
+ * @note Requires M5CoreS3.h to be included and CoreS3.begin() called first
+ * @return true if initialization successful
+ */
+bool ArduinoTTSChat::initM5CoreS3Speaker() {
+  _speakerType = SPEAKER_TYPE_M5CORES3;
+
+  // M5CoreS3 speaker is managed by M5Unified library
+  // User must call CoreS3.begin() before this
+  Serial.printf("M5CoreS3 speaker mode enabled at %d Hz\n", _sampleRate);
+  _speakerInitialized = true;
+
+  // Create audio playback task on core 0
+  xTaskCreatePinnedToCore(
+    audioTaskWrapper,
+    "AudioTask",
+    4096,
+    this,
+    1,
+    &_audioTaskHandle,
+    0
+  );
+  Serial.println("Audio playback task created on core 0");
+
+  return true;
+}
+
+/**
  * @brief Generate WebSocket handshake key
  * @return Base64 encoded random key string
  */
@@ -395,6 +423,14 @@ void ArduinoTTSChat::setCompletionCallback(CompletionCallback callback) {
  */
 void ArduinoTTSChat::setErrorCallback(ErrorCallback callback) {
   _errorCallback = callback;
+}
+
+/**
+ * @brief Set audio playback callback for M5CoreS3 mode
+ * @param callback Callback function pointer
+ */
+void ArduinoTTSChat::setAudioPlayCallback(AudioPlayCallback callback) {
+  _audioPlayCallback = callback;
 }
 
 /**
@@ -800,9 +836,24 @@ void ArduinoTTSChat::processAudioPlayback() {
     toRead = (toRead / 2) * 2;  // Align to 16-bit boundary
 
     if (toRead > 0) {
-      size_t written = _I2S.write(_audioBuffer + _audioReadPos, toRead);
+      size_t written = 0;
+
+      if (_speakerType == SPEAKER_TYPE_M5CORES3) {
+        // M5CoreS3 mode: use callback to play audio
+        if (_audioPlayCallback != nullptr) {
+          // Convert bytes to samples (16-bit audio = 2 bytes per sample)
+          size_t samples = toRead / 2;
+          if (_audioPlayCallback((const int16_t*)(_audioBuffer + _audioReadPos), samples, _sampleRate)) {
+            written = toRead;
+          }
+        }
+      } else {
+        // MAX98357 or Internal DAC mode: use I2S write
+        written = _I2S.write(_audioBuffer + _audioReadPos, toRead);
+      }
+
       if (written == 0) {
-        // I2S buffer full, try again next loop
+        // Buffer full or callback failed, try again next loop
         break;
       }
       _audioReadPos = (_audioReadPos + written) % AUDIO_BUFFER_SIZE;

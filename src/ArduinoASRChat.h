@@ -21,7 +21,8 @@
 #define MICROPHONE_TYPE_DEFINED
 enum MicrophoneType {
   MIC_TYPE_PDM,      // PDM microphone (e.g., ESP32-S3 onboard microphone)
-  MIC_TYPE_INMP441   // INMP441 I2S MEMS microphone
+  MIC_TYPE_INMP441,  // INMP441 I2S MEMS microphone
+  MIC_TYPE_M5CORES3  // M5CoreS3 built-in microphone (via M5Unified)
 };
 #endif
 
@@ -108,6 +109,14 @@ class ArduinoASRChat {
     bool initINMP441Microphone(int i2sSckPin, int i2sWsPin, int i2sSdPin);
 
     /**
+     * @brief Initialize M5CoreS3 built-in microphone
+     * @note Requires M5CoreS3.h to be included and CoreS3.begin() called first
+     * @note Microphone and speaker cannot be used simultaneously on M5CoreS3
+     * @return Whether initialization was successful
+     */
+    bool initM5CoreS3Microphone();
+
+    /**
      * @brief Connect to WebSocket server
      * @return Whether connection was successful
      */
@@ -140,6 +149,14 @@ class ArduinoASRChat {
      * @return true if recording, false if not recording
      */
     bool isRecording();
+
+    /**
+     * @brief Feed audio data from external source (for M5CoreS3 mode)
+     * @param data Pointer to audio data (16-bit signed PCM)
+     * @param samples Number of samples
+     * @note Only used when microphone type is MIC_TYPE_M5CORES3
+     */
+    void feedAudioData(const int16_t* data, size_t samples);
 
     /**
      * @brief Main loop processing function
@@ -209,6 +226,10 @@ class ArduinoASRChat {
     // Microphone configuration
     MicrophoneType _micType = MIC_TYPE_INMP441;  // Microphone type
     I2SClass _I2S;                              // I2S object
+
+    // M5CoreS3 microphone buffer (only used when _micType == MIC_TYPE_M5CORES3)
+    int16_t* _m5MicBuffer = nullptr;            // M5CoreS3 microphone buffer
+    static const size_t _m5MicBufferSize = 320; // Buffer size (samples)
 
     // WiFi client
     WiFiClientSecure _client;                  // Secure WiFi client

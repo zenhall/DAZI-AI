@@ -20,7 +20,8 @@
 #define SPEAKER_TYPE_DEFINED
 enum SpeakerType {
   SPEAKER_TYPE_INTERNAL,   // Internal DAC (GPIO25/26)
-  SPEAKER_TYPE_MAX98357    // MAX98357 I2S amplifier
+  SPEAKER_TYPE_MAX98357,   // MAX98357 I2S amplifier
+  SPEAKER_TYPE_M5CORES3    // M5CoreS3 built-in speaker (via M5Unified)
 };
 #endif
 
@@ -101,6 +102,13 @@ class ArduinoTTSChat {
     bool initInternalDAC(int dacPin = 25);
 
     /**
+     * @brief Initialize M5CoreS3 built-in speaker
+     * @note Requires M5CoreS3.h to be included and CoreS3.begin() called first
+     * @return Whether initialization was successful
+     */
+    bool initM5CoreS3Speaker();
+
+    /**
      * @brief Connect to WebSocket server
      * @return Whether connection was successful
      */
@@ -172,6 +180,21 @@ class ArduinoTTSChat {
      */
     void setErrorCallback(ErrorCallback callback);
 
+    /**
+     * @brief Audio playback callback function type for M5CoreS3
+     * @param data Audio data (16-bit PCM)
+     * @param samples Number of samples
+     * @param sampleRate Sample rate in Hz
+     * @return true if playback started successfully
+     */
+    typedef bool (*AudioPlayCallback)(const int16_t* data, size_t samples, uint32_t sampleRate);
+
+    /**
+     * @brief Set audio playback callback for M5CoreS3 mode
+     * @param callback Callback function pointer
+     */
+    void setAudioPlayCallback(AudioPlayCallback callback);
+
   private:
     // WebSocket configuration
     const char* _apiKey;                    // API key (JWT token)
@@ -233,6 +256,7 @@ class ArduinoTTSChat {
     // Callback functions
     CompletionCallback _completionCallback = nullptr;  // Completion callback
     ErrorCallback _errorCallback = nullptr;            // Error callback
+    AudioPlayCallback _audioPlayCallback = nullptr;    // Audio playback callback for M5CoreS3
 
     // Private helper methods
     String generateWebSocketKey();          // Generate WebSocket key
