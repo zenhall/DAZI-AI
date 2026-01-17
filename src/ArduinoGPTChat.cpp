@@ -653,7 +653,9 @@ String ArduinoGPTChat::_processResponse(String response) {
   DynamicJsonDocument jsonDoc(1024);
   deserializeJson(jsonDoc, response);
   String outputText = jsonDoc["choices"][0]["message"]["content"];
-  outputText.remove(outputText.indexOf('\n'));
+  // Replace newlines with spaces to preserve full response for TTS
+  outputText.replace("\n", " ");
+  outputText.replace("\r", "");
   return outputText;
 }
 
