@@ -47,7 +47,7 @@ static int16_t* micBuffer = nullptr;
 static const size_t MIC_BUFFER_SIZE = 320;  // ~20ms at 16kHz
 
 // Speaker volume (0-255)
-int speakerVolume = 200;
+int speakerVolume = 255;
 
 // ============================================================================
 // Configuration Variables
@@ -168,9 +168,8 @@ void displayInit() {
   CoreS3.Display.setTextDatum(MC_DATUM);
   CoreS3.Display.setFont(&fonts::FreeSansBold12pt7b);
   CoreS3.Display.setTextColor(TFT_WHITE);
-  CoreS3.Display.drawString("Voice Assistant", 160, 30);
+  CoreS3.Display.drawString("DAZI-M5 AI ASSISTANT", 160, 20);
   CoreS3.Display.setFont(&fonts::FreeSans9pt7b);
-  CoreS3.Display.drawString("M5CoreS3 Edition", 160, 60);
 }
 
 void displayStatus(const char* status, uint16_t color = TFT_YELLOW) {
@@ -179,14 +178,96 @@ void displayStatus(const char* status, uint16_t color = TFT_YELLOW) {
   CoreS3.Display.drawString(status, 160, 210);
 }
 
-void displayText(const char* label, const String& text, int y) {
-  CoreS3.Display.fillRect(0, y, 320, 50, TFT_BLACK);
+// Display user speech text (multi-line area)
+void displayUserText(const String& text) {
+  // Clear user area (y=40 to y=85)
+  CoreS3.Display.fillRect(0, 40, 320, 45, TFT_BLACK);
   CoreS3.Display.setTextColor(TFT_CYAN);
-  CoreS3.Display.drawString(label, 160, y + 10);
+  CoreS3.Display.setTextDatum(TL_DATUM);  // Top-left align
+  CoreS3.Display.drawString("You:", 5, 42);
   CoreS3.Display.setTextColor(TFT_WHITE);
-  // Truncate long text
-  String displayStr = text.length() > 35 ? text.substring(0, 35) + "..." : text;
-  CoreS3.Display.drawString(displayStr.c_str(), 160, y + 35);
+
+  const int maxCharsPerLine = 38;
+  const int maxLines = 2;
+  const int lineHeight = 18;
+  int startY = 42;
+  int startX = 45;  // After "You:" label
+
+  String remaining = text;
+  int lineCount = 0;
+
+  while (remaining.length() > 0 && lineCount < maxLines) {
+    String line;
+    int lineMaxChars = (lineCount == 0) ? maxCharsPerLine - 5 : maxCharsPerLine;  // First line shorter
+
+    if (remaining.length() <= lineMaxChars) {
+      line = remaining;
+      remaining = "";
+    } else {
+      int cutPos = lineMaxChars;
+      int lastSpace = remaining.lastIndexOf(' ', lineMaxChars);
+      if (lastSpace > 10) cutPos = lastSpace;
+      line = remaining.substring(0, cutPos);
+      remaining = remaining.substring(cutPos);
+      remaining.trim();
+    }
+
+    if (lineCount == maxLines - 1 && remaining.length() > 0) {
+      if (line.length() > lineMaxChars - 3) line = line.substring(0, lineMaxChars - 3);
+      line += "...";
+    }
+
+    int x = (lineCount == 0) ? startX : 5;
+    CoreS3.Display.drawString(line.c_str(), x, startY + lineCount * lineHeight);
+    lineCount++;
+  }
+  CoreS3.Display.setTextDatum(MC_DATUM);  // Reset to center
+}
+
+// Display AI response text (multi-line area)
+void displayAIText(const String& text) {
+  // Clear AI area (y=90 to y=195)
+  CoreS3.Display.fillRect(0, 90, 320, 105, TFT_BLACK);
+  CoreS3.Display.setTextColor(TFT_CYAN);
+  CoreS3.Display.setTextDatum(TL_DATUM);  // Top-left align
+  CoreS3.Display.drawString("AI:", 5, 92);
+  CoreS3.Display.setTextColor(TFT_WHITE);
+
+  const int maxCharsPerLine = 38;
+  const int maxLines = 5;
+  const int lineHeight = 18;
+  int startY = 92;
+  int startX = 30;  // After "AI:" label
+
+  String remaining = text;
+  int lineCount = 0;
+
+  while (remaining.length() > 0 && lineCount < maxLines) {
+    String line;
+    int lineMaxChars = (lineCount == 0) ? maxCharsPerLine - 3 : maxCharsPerLine;  // First line shorter
+
+    if (remaining.length() <= lineMaxChars) {
+      line = remaining;
+      remaining = "";
+    } else {
+      int cutPos = lineMaxChars;
+      int lastSpace = remaining.lastIndexOf(' ', lineMaxChars);
+      if (lastSpace > 10) cutPos = lastSpace;
+      line = remaining.substring(0, cutPos);
+      remaining = remaining.substring(cutPos);
+      remaining.trim();
+    }
+
+    if (lineCount == maxLines - 1 && remaining.length() > 0) {
+      if (line.length() > lineMaxChars - 3) line = line.substring(0, lineMaxChars - 3);
+      line += "...";
+    }
+
+    int x = (lineCount == 0) ? startX : 5;
+    CoreS3.Display.drawString(line.c_str(), x, startY + lineCount * lineHeight);
+    lineCount++;
+  }
+  CoreS3.Display.setTextDatum(MC_DATUM);  // Reset to center
 }
 
 void displayVolume() {
@@ -558,7 +639,7 @@ void handleASRResult() {
     Serial.printf("%s\n", transcribedText.c_str());
     Serial.println("==============================");
 
-    displayText("You:", transcribedText, 90);
+    displayUserText(transcribedText);
 
     // Switch to speaker before LLM processing (speaker will be used for TTS)
     switchToSpeaker();
@@ -574,7 +655,7 @@ void handleASRResult() {
       Serial.printf("%s\n", response.c_str());
       Serial.println("========================");
 
-      displayText("AI:", response, 140);
+      displayAIText(response);
 
       currentState = STATE_PLAYING_TTS;
       displayStatus("Speaking...", TFT_CYAN);
