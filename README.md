@@ -14,6 +14,17 @@ English | [简体中文](./README_CN.md)
 
 </div>
 
+## 📷 Hardware & Tutorials
+
+<div align="center">
+
+| Breadboard Version | M5CoreS3 Version |
+|:------------------:|:----------------:|
+| <img src="img/dazi-breadboard.jpg" alt="Breadboard Version" width="300"/> | <img src="img/dazi-m5.png" alt="M5CoreS3 Version" width="300"/> |
+| [📺 YouTube Tutorial](https://www.youtube.com/watch?v=bXd6o99LcDA) | [📺 YouTube Tutorial](https://www.youtube.com/watch?v=KxlHjt9SkPY) |
+
+</div>
+
 ## ✨ Table of Contents
 
 - [Project Introduction](#-project-introduction)
@@ -208,81 +219,28 @@ DAZI-AI/
 
 ## 📚 Example Projects
 
-### 1. Push-to-Talk Voice Chat (examples/chat)
-Traditional push-to-talk voice interaction system with ChatGPT.
+### Main Programs (Recommended)
 
-**Features:**
-- Push-to-talk voice recording with INMP441 microphone using BOOT button
-- Speech-to-text conversion using OpenAI Whisper API
-- ChatGPT conversation processing with customizable system prompts
-- Text-to-speech output with natural voice playback
-- Real-time audio processing and I2S audio output
-- Configurable API endpoints for different OpenAI-compatible services
+| Version | Example | Description |
+|---------|---------|-------------|
+| **Breadboard** | `examples/chat_configurable` | Breadboard version with website one-click API configuration |
+| **M5CoreS3** | `examples/chat_configurable_m5cores3` | M5CoreS3 version with website one-click API configuration |
 
-**Usage:**
-- Hold the BOOT button to start voice recording
-- Speak while holding the button
-- Release the button to stop recording and send to ChatGPT
-- The system will transcribe your speech and send it to ChatGPT
-- ChatGPT's response will be played back as speech through the speaker
+These main programs support easy configuration through a web interface - no need to modify code for API keys!
 
-**Control:**
-- The system uses the ESP32's built-in BOOT button (GPIO 0) for voice control
-- Press and hold to record, release to process
-- No need to type commands in serial monitor - just use the button!
+### Legacy Version
 
-### 2. Continuous Conversation Mode (examples/chat_asr) ⭐ NEW
-Advanced continuous voice conversation with real-time ASR and conversation memory.
-
-**Features:**
-- **Real-time ASR**: ByteDance ASR API for streaming speech recognition
-- **VAD (Voice Activity Detection)**: Automatic detection of speech start/end
-- **Seamless Conversation Loop**: Automatic ASR → LLM → TTS → ASR cycle
-- **Conversation Memory**: Maintains context across multiple conversation turns
-- **One-Button Control**: Single button press to start/stop continuous mode
-- **Intelligent Timeouts**: Auto-exit continuous mode if no speech detected
-- **State Machine Design**: Robust state management for smooth transitions
-
-**How It Works:**
-1. **Press BOOT button** → Enters continuous conversation mode
-2. **ASR Listening** → System starts listening for speech automatically
-3. **Speech Detection** → VAD detects when you start and stop speaking
-4. **Auto Processing** → Transcription sent to ChatGPT automatically
-5. **TTS Playback** → AI response plays through speaker
-6. **Auto Loop** → System automatically returns to listening state
-7. **Press BOOT again** → Exit continuous mode
-
-**Configuration Options:**
-- `ENABLE_CONVERSATION_MEMORY`: Toggle conversation history on/off (line 7)
-- `systemPrompt`: Customize AI personality and behavior (lines 81-104)
-- `setSilenceDuration()`: Adjust silence detection threshold (line 194)
-- `setMaxRecordingSeconds()`: Set maximum recording duration (line 195)
-
-**Usage:**
-- Press BOOT button once to start continuous conversation mode
-- Speak naturally - system will detect when you start and stop talking
-- AI responses play automatically
-- System loops back to listening after each response
-- Press BOOT button again to exit continuous mode
-
-**State Machine:**
-```
-IDLE → LISTENING → PROCESSING_LLM → PLAYING_TTS → WAIT_TTS_COMPLETE → LISTENING (loop)
-```
-
-**Benefits:**
-- No need to hold button while speaking
-- Natural conversation flow like talking to a person
-- Context-aware responses with conversation memory
-- Automatic voice detection eliminates manual control
+| Example | Description |
+|---------|-------------|
+| `examples/chat_asr` | Original version requiring manual API key configuration in code |
 
 ## 💬 Community
 
 Join our Discord community to share development experiences, ask questions, and collaborate with other developers:
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/RFPwfhTM)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/GefSMJzwQ3)
 
-**Discord Server**: https://discord.gg/RFPwfhTM
+**Discord Server**: https://discord.com/invite/GefSMJzwQ3
 
 ---
 
