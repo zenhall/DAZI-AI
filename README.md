@@ -59,6 +59,17 @@ DAZI-AI is a serverless AI voice assistant developed entirely on the ESP32 platf
 - Configurable conversation memory to maintain context
 - One-button control to start/stop continuous mode
 
+✅ **One-Click Voice Cloning & Custom Voice Design**:
+- Web-based one-click voice cloning at [steb2.com](https://steb2.com)
+- Create and customize unique AI voice personas
+- Easy configuration through web interface
+
+<div align="center">
+<img src="img/onebuttonclone.png" alt="One-Click Voice Cloning" width="600"/>
+
+*Voice cloning configuration at [steb2.com](https://steb2.com)*
+</div>
+
 
 ## 🔧 System Architecture
 
